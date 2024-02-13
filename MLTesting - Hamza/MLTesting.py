@@ -4,12 +4,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy import stats
+from scipy import signal
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.neighbors import KernelDensity
 from sklearn.metrics import (
     mean_absolute_error, mean_squared_error, r2_score,
     precision_score, recall_score, f1_score, confusion_matrix
@@ -161,97 +163,12 @@ predictions = model.predict(X_test_scaled)
 X = data[['SEX M=1 F=2', 'agechild_years', 'weight kg', 'height_cm', 'waistc_cm', 'Biomipedance Index']]
 y = data['TBW kg_DDM']
 
-# Build the XGBoost model using the filtered data
-model_xgb = XGBRegressor(objective='reg:squarederror', random_state=42)
-model_xgb.fit(X_train, y_train)
-
-# Make predictions on the test set
-# X_test, y_test = remove_outliers(X_test_scaled, y_test)
-predictions_xgb = model_xgb.predict(X_test)
-
-# Calculate MSE for the filtered data
-mse_xgb = mean_absolute_error(y_test, predictions_xgb)
-print(f'Mean Absolute Error on Test Data (XGBoost - No Outliers): {mse_xgb:.2f}')
-
-# Create a 3D plot
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')  # 3D projection
-
-# Scatter plot of Biomipedance Index, Total Body Water, and Height
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], y_test, label='Actual', color='blue', alpha=0.6)
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], predictions_xgb, label='Predicted', color='red', alpha=0.6)
-
-# Set labels for each axis
-ax.set_xlabel('Biomipedance Index')
-ax.set_ylabel('Height (cm)')
-ax.set_zlabel('Total Body Water')
-
-# Add a legend with MSE
-ax.legend(labels=[f'MAE: {mse_xgb:.2f}'], loc='upper right')
-
-plt.title("Total Body Water vs. Biomipedance Index and Height : XGB")
-plt.show()
-
-
 model_nn = Sequential([
     Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
     Dense(32, activation='relu'),
     Dense(1)
 ])
 
-model_nn.compile(optimizer='adam', loss='mean_squared_error')
-model_nn.fit(X_train, y_train, epochs=50, batch_size=8, validation_data=(X_test, y_test))
-predictions_nn = model_nn.predict(X_test)
-mse_nn = mean_absolute_error(y_test, predictions_nn)
-
-# Create a 3D plot
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')  # 3D projection
-
-# Scatter plot of Biomipedance Index, Total Body Water, and Height
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], y_test, label='Actual', color='blue', alpha=0.6)
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], predictions_nn, label='Predicted', color='red', alpha=0.6)
-
-# Set labels for each axis
-ax.set_xlabel('Biomipedance Index')
-ax.set_ylabel('Height (cm)')
-ax.set_zlabel('Total Body Water')
-
-# Add a legend with MSE
-ax.legend(labels=[f'MAE: {mse_nn:.2f}'], loc='upper right')
-
-plt.title("Total Body Water vs. Biomipedance Index and Height : NN")
-plt.show()
-
-model_gb = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
-model_gb.fit(X_train, y_train)
-predictions_gb = model_gb.predict(X_test)
-mse_gb = mean_absolute_error(y_test, predictions_gb)
-
-# Create a 3D plot
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')  # 3D projection
-
-# Scatter plot of Biomipedance Index, Total Body Water, and Height
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], y_test, label='Actual', color='blue', alpha=0.6)
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], predictions_gb, label='Predicted', color='red', alpha=0.6)
-
-# Set labels for each axis
-ax.set_xlabel('Biomipedance Index')
-ax.set_ylabel('Height (cm)')
-ax.set_zlabel('Total Body Water')
-
-# Add a legend with MSE
-ax.legend(labels=[f'MAE: {mse_gb:.2f}'], loc='upper right')
-
-plt.title("Total Body Water vs. Biomipedance Index and Height : GB")
-plt.show()
-
-model_nn = Sequential([
-    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    Dense(32, activation='relu'),
-    Dense(1)
-])
 model_nn.compile(optimizer='adam', loss='mean_squared_error')
 model_nn.fit(X_train, y_train, epochs=50, batch_size=8, validation_data=(X_test, y_test))
 predictions_nn = model_nn.predict(X_test)
@@ -312,45 +229,6 @@ ax.set_zlabel('Total Body Water')
 ax.legend(title=f'MAE: {mse_nn:.2f}', loc='upper right')
 
 plt.title("Total Body Water vs. Biomipedance Index and Height : Absolute ERROR NN")
-plt.show()
-
-input_layer = Input(shape=(X_train.shape[1],))
-x = Dense(128, activation='relu')(input_layer)
-x = Dense(64, activation='relu')(x)
-x = Dense(64, activation='relu')(x)
-x = Dense(32, activation='relu')(x)
-output_layer = Dense(1)(x)
-
-model_deep_nn = Model(inputs=input_layer, outputs=output_layer)
-# model_deep_nn.compile(optimizer='rmsprop', loss='mean_squared_error')
-model_deep_nn.compile(optimizer='adam', loss='mean_absolute_error')
-
-# Train the model
-history = model_deep_nn.fit(X_train, y_train, epochs=50, batch_size=8, validation_data=(X_test, y_test))
-
-# Predict on the test set
-predictions_deep_nn = model_deep_nn.predict(X_test).flatten()  # Flatten the predictions array
-
-# Calculate Mean Absolute Error
-mse_dnn = mean_absolute_error(y_test, predictions_deep_nn)
-
-# Plotting
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')
-
-# Adjust the plotting based on your DataFrame's structure
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], y_test, label='Actual', color='blue', alpha=0.6)
-ax.scatter(X_test['Biomipedance Index'], X_test['height_cm'], predictions_deep_nn, label='Predicted', color='red', alpha=0.6)
-
-# Set labels for each axis
-ax.set_xlabel('Biomipedance Index')
-ax.set_ylabel('Height (cm)')
-ax.set_zlabel('Total Body Water')
-
-# Add a legend with MAE
-ax.legend(title=f'MAE: {mse_dnn:.2f}', loc='upper right')
-
-plt.title("Total Body Water vs. Biomipedance Index and Height : DNN")
 plt.show()
 
 # Train a Random Forest regressor
@@ -440,7 +318,7 @@ data['ABSI'] = data['waistc_cm'] * (data['BMI']) / data['height_cm']
 
 # Define features for linear regression
 # Ensure the feature names match exactly with the column names in your dataset
-x = data[['weight kg', 'BMI', 'BSA', 'Height to Weight', 'Height to Waist', 'Weight to Waist', 'Bioimpedance Index']]
+x = data[['weight kg', 'BMI', 'BSA', 'Height to Weight', 'Bioimpedance Index']]
 y = data['TBW kg_DDM']
 
 # Split the data into training and testing sets
