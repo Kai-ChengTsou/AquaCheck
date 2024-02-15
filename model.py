@@ -3,6 +3,7 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 import matplotlib.pyplot as plt
 from scipy import signal
+from itertools import combinations
 
 from sklearn.neighbors import KernelDensity
 from sklearn.linear_model import LinearRegression
@@ -119,9 +120,12 @@ dehydrated_test_data = pd.DataFrame({
   'Weight': [70]*8,
   'Height': [173]*8, 
   'Age': [22.52]*8,
-  'Impedance': Imp_post})
+  'Imp': Imp_post,
+  'R': R_post,
+  'Xc':Xc_post,
+  'Pha': Pha_post})
 
-dehydrated_test_data['Bioimpedance Index'] = (dehydrated_test_data['Height'] ** 3) / dehydrated_test_data['Impedance']
+dehydrated_test_data['Bioimpedance Index'] = (dehydrated_test_data['Height'] ** 3) / dehydrated_test_data['Imp']
 dehydrated_test_data['BMI'] = dehydrated_test_data['Weight'] / (dehydrated_test_data['Height'] / 100) ** 2
 dehydrated_test_data['BSA'] = 0.007184 * dehydrated_test_data['Height'] ** 0.725 * dehydrated_test_data['Weight'] ** 0.425
 dehydrated_test_data['Height to Weight'] = dehydrated_test_data['Height'] / dehydrated_test_data['Weight']
@@ -137,8 +141,8 @@ time_of_day = [8,10,12,12.5,13,14,16,18]
 # Plot for TBW
 plt.subplot(1, 2, 1)
 plt.plot(time_of_day, tbw_kg_at_test, label='Ground Truth')
-plt.plot(time_of_day, tbw_from_equation +np.average(tbw_kg_at_test)-np.average(tbw_from_equation), label='Equation Prediction')
-plt.plot(time_of_day, tbw_pred +np.average(tbw_kg_at_test)-np.average(tbw_pred), label='Model Prediction')
+plt.plot(time_of_day, tbw_from_equation, label='Equation Prediction')
+# plt.plot(time_of_day, tbw_pred, label='Model Prediction')
 plt.title('Dehydrated Test - TBW')
 plt.ylabel('TBW (kg)')
 plt.xlabel('Time of day (h)')
@@ -147,8 +151,8 @@ plt.legend()
 # Plot for FFM
 plt.subplot(1, 2, 2)
 plt.plot(time_of_day, ffm_kg_at_test, label='Ground Truth')
-plt.plot(time_of_day, ffm_from_equation +np.average(ffm_kg_at_test)-np.average(ffm_from_equation), label='Equation Prediction')
-plt.plot(time_of_day, ffm_pred +np.average(ffm_kg_at_test)-np.average(ffm_pred), label='Model Prediction')
+plt.plot(time_of_day, ffm_from_equation, label='Equation Prediction')
+# plt.plot(time_of_day, ffm_pred, label='Model Prediction')
 plt.title('Dehydrated Test - FFM')
 plt.ylabel('FFM (kg)')
 plt.xlabel('Time of day (h)')
@@ -156,34 +160,35 @@ plt.legend()
 plt.show()
 
 #####################################################################################################################
-
 collected_data = pd.read_excel('./MLTesting - Hamza/Datasets/Collected Dataset.xlsx')
-collected_data['Index'] = collected_data['Height'] **3 / collected_data['Imp']
-x = collected_data[['R','Xc','Weight','Height','Age']]
-y_tbw = collected_data['TBW kg_Scale']
-y_ffm = collected_data['FFM kg_Sale']
+collected_data['Bioimpedance Index'] = collected_data['Height'] **3 / collected_data['Imp']
+collected_data['BMI'] = collected_data['Weight'] / (collected_data['Height'] / 100) ** 2
+collected_data['BSA'] = 0.007184 * collected_data['Height'] ** 0.725 * collected_data['Weight'] ** 0.425
+collected_data['Height to Weight'] = collected_data['Height'] / collected_data['Weight']
 
-filtered_data = collected_data[collected_data['Person'] != 'Luis']
-x_train = filtered_data[['Index','Xc','Weight','Height','Age']]
-
-y_tbw_train = filtered_data['TBW kg_Scale']
-y_ffm_train = filtered_data['FFM kg_Sale']
+filtered_data = collected_data[collected_data['Imp'] < 480]
+x_tbw = filtered_data[['Xc', 'BMI', 'Height', 'Age', 'BMI', 'BSA', 'Height to Weight', 'Pha']]
+x_ffm = filtered_data[['Xc', 'BMI', 'Height', 'Age', 'BMI', 'Height to Weight', 'Pha']]
+y_tbw = filtered_data['TBW kg_Scale']
+y_ffm = filtered_data['FFM kg_Sale']
 
 tbw_model_col = LinearRegression()
 ffm_model_col = LinearRegression()
-tbw_model_col.fit(x_train,y_tbw_train)
-ffm_model_col.fit(x_train,y_ffm_train)
+tbw_model_col.fit(x_tbw,y_tbw)
+ffm_model_col.fit(x_ffm,y_ffm)
 
-filtered_data = collected_data[collected_data['Person'] == 'Luis']
-x = filtered_data[['Index','Xc','Weight','Height','Age']]
+filtered_test_data = collected_data[collected_data['Person'] == 'Luis']
+x_tbw_test = dehydrated_test_data[['Xc', 'BMI', 'Height', 'Age', 'BMI', 'BSA', 'Height to Weight', 'Pha']]
+x_ffm_test = dehydrated_test_data[['Xc', 'BMI', 'Height', 'Age', 'BMI', 'Height to Weight', 'Pha']]
 
-pred_tbw = tbw_model_col.predict(x)
-pred_ffm = ffm_model_col.predict(x)
+pred_tbw = tbw_model_col.predict(x_tbw_test)
+pred_ffm = ffm_model_col.predict(x_ffm_test)
 
 plt.figure(figsize=(12, 5))
 # Plot for TBW
 plt.subplot(1, 2, 1)
-plt.plot(time_of_day, filtered_data['TBW kg_Scale'], label='Ground Truth')
+plt.plot(time_of_day, filtered_test_data['TBW kg_Scale'], label='Ground Truth')
+plt.plot(time_of_day, tbw_from_equation, label='Equation Prediction')
 plt.plot(time_of_day, pred_tbw, label='Prediction')
 plt.title('Dehydrated Test - TBW')
 plt.ylabel('TBW (kg)')
@@ -192,8 +197,9 @@ plt.legend()
 
 # Plot for FFM
 plt.subplot(1, 2, 2)
-plt.plot(time_of_day, filtered_data['FFM kg_Sale'], label='Ground Truth')
-plt.plot(time_of_day, pred_ffm, label='Prediction')
+plt.plot(time_of_day, filtered_test_data['FFM kg_Sale'], label='Ground Truth')
+plt.plot(time_of_day, ffm_from_equation, label='Equation Prediction')
+plt.plot(time_of_day, pred_ffm, label='Model Prediction')
 plt.title('Dehydrated Test - FFM')
 plt.ylabel('FFM (kg)')
 plt.xlabel('Time of day (h)')
