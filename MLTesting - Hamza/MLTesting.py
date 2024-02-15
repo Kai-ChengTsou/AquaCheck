@@ -36,7 +36,7 @@ data = data.drop('FM kg_BIA', axis=1)
 data = data.drop('%BF_BIA', axis=1)
 data = data.drop('%BF_DDM', axis=1)
 data = data.drop('FFM kg_DDM', axis=1)
-data = data.drop('FM kg_DDM ', axis=1)
+#data = data.drop('FM kg_DDM', axis=1)
 data = data.drop('%FFM_DDM', axis=1)
 data = data.drop('hydration', axis=1)
 
