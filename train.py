@@ -1,34 +1,28 @@
 import pandas as pd
 import numpy as np
-import lightgbm as lgb
-from scipy.interpolate import PchipInterpolator
 import matplotlib.pyplot as plt
+
+from scipy.interpolate import PchipInterpolator
 from scipy import signal
+
 from catboost import CatBoostRegressor
 
-from sklearn.neighbors import KernelDensity
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.compose import TransformedTargetRegressor
-from sklearn.preprocessing import QuantileTransformer
-from sklearn.linear_model import Lasso
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.linear_model import ElasticNet
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler, QuantileTransformer
+from sklearn.linear_model import LinearRegression, Lasso, ElasticNet
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.ensemble import StackingRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import GradientBoostingRegressor, StackingRegressor
+from sklearn.compose import TransformedTargetRegressor
 
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.keras.regularizers import l1_l2
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.regularizers import l1_l2, l2
 
+import lightgbm as lgb
 import xgboost as xgb
 from joblib import dump
 
