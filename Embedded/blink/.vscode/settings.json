@@ -1,0 +1,5 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.port": "/dev/cu.Bluetooth-Incoming-Port",
+  "idf.adapterTargetName": "esp32"
+}
