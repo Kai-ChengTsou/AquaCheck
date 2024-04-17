@@ -5,11 +5,12 @@ from scipy.stats import norm
 from scipy import signal
 from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
+from joblib import load
 
 def calculate_baseline(df):
     weights = norm.pdf([1,2,3,4,5,6], 6, 2)
     weights /= weights.sum()
-    baseline = np.dot(weights, df['TBW Equation'])
+    baseline = np.dot(weights, df['TBW Model'])
     return baseline
 
 def read_data_from_file(filename):
@@ -45,22 +46,22 @@ def get_user_information():
     return height, weight, age, gender
 
 def calculate_hydrated_state(df, baseline, dehydration_deviation):
-    deviations = df['TBW Equation'] - baseline
+    deviations = df['TBW Model'] - baseline
     hydration_scores = []
     hydration_categories = []
     print(4*dehydration_deviation)
     for deviation in deviations:
         print(deviation)
         
-        if deviation > -4*dehydration_deviation:
+        if deviation > -5*dehydration_deviation:
             hydration_category = 'Hydrated'
-            hydration_score = 1 + (deviation / (16*dehydration_deviation))
-        elif deviation > -8*dehydration_deviation:
+            hydration_score = 1 + (deviation / (20*dehydration_deviation))
+        elif deviation > -10*dehydration_deviation:
             hydration_category = 'Moderately Dehydrated'
-            hydration_score = max(0, min(1, 1 + (deviation / (16*dehydration_deviation))))
+            hydration_score = max(0, min(1, 1 + (deviation / (20*dehydration_deviation))))
         else:
             hydration_category = 'Severely Dehydrated'
-            hydration_score = max(0, min(1, 1 + (deviation / (16*dehydration_deviation))))
+            hydration_score = max(0, min(1, 1 + (deviation / (20*dehydration_deviation))))
         
         # Append hydration score and category to the lists
         hydration_categories.append(hydration_category)
@@ -78,15 +79,16 @@ def main():
         #print(f"Baseline data:\n{df}")
         baseline = calculate_baseline(df)
         print(baseline)
-        baseline_deviation = baseline - df['TBW Equation'].iloc[0]
+        baseline_deviation = baseline - df['TBW Model'].iloc[0]
         print(baseline_deviation)
     else:
         print("No baseline file found.")
 
-    height, weight, age, gender = get_user_information()
+    
 
     new_measurement_path = os.path.join(base_directory, 'new measurements')
     new_measurements = pd.DataFrame(columns=['R', 'Xc'])
+    height, weight, age, gender = get_user_information()
     for measurement_file in os.listdir(new_measurement_path):
         date = measurement_file[9:13] + '-' + measurement_file[13:15] + '-' + measurement_file[15:17] + ' ' + measurement_file[18:20] + ':' + measurement_file[20:22] + ':' + measurement_file[22:24]
         date = pd.to_datetime(date)
@@ -96,16 +98,26 @@ def main():
 
         temp_df = pd.DataFrame({'Date': [date], 'R': [R], 'Xc': [Xc]})
         new_measurements = pd.concat([new_measurements, temp_df])
-    
+    new_measurements['Height'] = height
+    new_measurements['Weight'] = weight
+    new_measurements['Age'] = age
+    new_measurements['Gender'] = gender
     new_measurements.set_index('Date', inplace=True)
     new_measurements.sort_index(inplace=True)
+    new_measurements['Height to Weight'] = height/weight
+    new_measurements['BMI'] = weight / (height / 100) ** 2
+    new_measurements['Adjusted R'] = new_measurements['R'] * 0.48 + 187.56
+    new_measurements['BSA'] = 0.007184 * height ** 0.725 * weight ** 0.425
+    new_measurements['BioImpedance Index'] = (height ** 3 / new_measurements['Adjusted R'])
+    new_measurements['TBW Equation'] = ((1.2 + 0.45 * height**2 / (new_measurements['Adjusted R']) + 0.18 * weight) - 40.58) * (0.30/0.50) + 40.58
     
-    new_measurements['TBW Equation'] = ((1.2 + 0.45 * height**2 / (new_measurements['R'] * 0.48 + 187.56) + 0.18 * weight) - 40.58) * (0.30/0.50) + 40.58
+    stacking_model_tbw = load('../stacking_model_tbw.joblib')
+    x_dehydrated = new_measurements[['Gender', 'Age', 'Weight', 'Height', 'BMI', 'BSA', 'Height to Weight', 'BioImpedance Index']]
     
+    new_measurements['TBW Model'] = stacking_model_tbw.predict(x_dehydrated)
     new_measurements['hydration category'], new_measurements['hydration score'] = calculate_hydrated_state(new_measurements,baseline,baseline_deviation)
     print(new_measurements)
 
-    
     color_map = {'Hydrated': 'green', 'Moderately Dehydrated': 'orange', 'Severely Dehydrated': 'red'}
 
     # Plot hydration Index with color mapping
