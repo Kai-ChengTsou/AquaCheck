@@ -7,10 +7,13 @@ from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
 from joblib import load
 
-def calculate_baseline(df):
+def calculate_baseline(df, model = True):
     weights = norm.pdf([1,2,3,4,5,6], 6, 2)
     weights /= weights.sum()
-    baseline = np.dot(weights, df['TBW Model'])
+    if model:
+        baseline = np.dot(weights, df['TBW Model'])
+    else:
+        baseline = np.dot(weights, df['TBW Equation'])
     return baseline
 
 def read_data_from_file(filename):
@@ -45,13 +48,16 @@ def get_user_information():
     gender = int(input("Enter your gender (1-Male/2-Female): "))
     return height, weight, age, gender
 
-def calculate_hydrated_state(df, baseline, dehydration_deviation):
-    deviations = df['TBW Model'] - baseline
+def calculate_hydrated_state(df, baseline, dehydration_deviation, model=True):
+    if model:
+        deviations = df['TBW Model'] - baseline
+    else:
+        deviations = df['TBW Equation'] - baseline
     hydration_scores = []
     hydration_categories = []
-    print(4*dehydration_deviation)
+    print(f'Dehydration threshold:        {5*dehydration_deviation:.2f} kg (or L)')
+    print(f'Severe dehydration threshold: {10*dehydration_deviation:.2f} kg (or L)')
     for deviation in deviations:
-        print(deviation)
         
         if deviation > -5*dehydration_deviation:
             hydration_category = 'Hydrated'
@@ -70,21 +76,22 @@ def calculate_hydrated_state(df, baseline, dehydration_deviation):
     return hydration_categories, hydration_scores
 
 def main():
-
     base_directory = os.path.dirname(os.path.abspath(__file__))
                                      
     historical_path = os.path.join(base_directory, 'historical', 'baseline.csv')
     if os.path.exists(historical_path):
         df = pd.read_csv(historical_path,index_col='Date')
         #print(f"Baseline data:\n{df}")
-        baseline = calculate_baseline(df)
-        print(baseline)
-        baseline_deviation = baseline - df['TBW Model'].iloc[0]
-        print(baseline_deviation)
+        baseline_model = calculate_baseline(df, True)
+        baseline_equation = calculate_baseline(df, False)
+        print(f'Model baseline:    {baseline_model:.2f}')
+        print(f'Equation baseline: {baseline_equation:.2f}')
+        baseline_deviation_model = baseline_model - df['TBW Model'].iloc[0]
+        baseline_deviation_equation = baseline_equation - df['TBW Equation'].iloc[0]
+        print(f'Baseline model deviation:    {baseline_deviation_model:.2f}')
+        print(f'Baseline equation deviation: {baseline_deviation_equation:.2f}')
     else:
         print("No baseline file found.")
-
-    
 
     new_measurement_path = os.path.join(base_directory, 'new measurements')
     new_measurements = pd.DataFrame(columns=['R', 'Xc'])
@@ -111,24 +118,39 @@ def main():
     new_measurements['BioImpedance Index'] = (height ** 3 / new_measurements['Adjusted R'])
     new_measurements['TBW Equation'] = ((1.2 + 0.45 * height**2 / (new_measurements['Adjusted R']) + 0.18 * weight) - 40.58) * (0.30/0.50) + 40.58
     
-    stacking_model_tbw = load('../stacking_model_tbw.joblib')
+    stacking_model_tbw = load('model/stacking_model_tbw.joblib')
     x_dehydrated = new_measurements[['Gender', 'Age', 'Weight', 'Height', 'BMI', 'BSA', 'Height to Weight', 'BioImpedance Index']]
     
     new_measurements['TBW Model'] = stacking_model_tbw.predict(x_dehydrated)
-    new_measurements['hydration category'], new_measurements['hydration score'] = calculate_hydrated_state(new_measurements,baseline,baseline_deviation)
+    new_measurements['hydration category model'], new_measurements['hydration score model'] = calculate_hydrated_state(new_measurements,baseline_model,baseline_deviation_model)
+    new_measurements['hydration category equation'], new_measurements['hydration score equation'] = calculate_hydrated_state(new_measurements,baseline_equation,baseline_deviation_equation,False)
+
+
     print(new_measurements)
 
-    color_map = {'Hydrated': 'green', 'Moderately Dehydrated': 'orange', 'Severely Dehydrated': 'red'}
-
+    color_map_model = {'Hydrated': 'green', 'Moderately Dehydrated': 'orange'} # 'Severely Dehydrated': 'red'
+    color_map_equation = {'Hydrated': '#76b947', 'Moderately Dehydrated': '#cc8400'}
+    fig, ax = plt.subplots()
     # Plot hydration Index with color mapping
-    for category, score, date in zip(new_measurements['hydration category'], new_measurements['hydration score'], new_measurements.index):
-        plt.scatter(date, score, color=color_map[category], marker='o')
-    plt.plot(new_measurements.index,[0.75]*len(new_measurements.index),color='orange')
-    plt.plot(new_measurements.index,[0.5]*len(new_measurements.index),color='red')
-    plt.gcf().autofmt_xdate()
-    plt.ylabel('Hydration Score')
-    plt.xlabel('Time')
-    plt.grid(True, linestyle='--', alpha=0.5)
+    for category, score, date in zip(new_measurements['hydration category model'], new_measurements['hydration score model'], new_measurements.index):
+        ax.scatter(date, score, color=color_map_model[category], marker='o')
+    for i, category in enumerate(color_map_model):
+        ax.scatter([], [], color=color_map_model[category], label=category + ' model')  
+
+    for category, score, date in zip(new_measurements['hydration category equation'], new_measurements['hydration score equation'], new_measurements.index):
+        ax.scatter(date, score, color=color_map_equation[category], marker='o')
+    for i, category in enumerate(color_map_equation):
+        ax.scatter([], [], color=color_map_equation[category], label=category + ' equation') 
+ 
+    ax.plot(new_measurements.index,[0.75]*len(new_measurements.index),color='orange')
+    ax.plot(new_measurements.index,[0.5]*len(new_measurements.index),color='red')
+    # ax.gcf().autofmt_xdate()
+    ax.set_ylabel('TBW (kg)')
+    ax.set_xlabel('Time')
+    ax.set_xticklabels(['11AM','12PM','1PM','2PM','3PM','4PM'])
+    ax.set_title('Hydration Score on Dehydrated Bar Test')
+    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.legend()
     plt.show()
 
 if __name__ == "__main__":
